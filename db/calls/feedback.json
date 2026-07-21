@@ -1,0 +1,16 @@
+[
+  {
+    "id": "fb-ed8f15b3-f130-4240-8dc5-a06dbcced0f1",
+    "call_log_id": "718365d2-db46-420c-b228-cdf754665669",
+    "customer_id": "cust-1",
+    "agent_id": "agent-1",
+    "ratings": {
+      "professionalism": 3,
+      "callQuality": 3,
+      "resolution": 4,
+      "overall": 5
+    },
+    "comment": "",
+    "created_at": "2026-07-18T11:59:12.470Z"
+  }
+]

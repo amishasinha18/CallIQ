@@ -1,0 +1,30 @@
+[
+  {
+    "id": "718365d2-db46-420c-b228-cdf754665669",
+    "customer_id": "cust-1",
+    "agent_id": "agent-1",
+    "product_id": "product-1",
+    "status": "completed",
+    "started_at": "2026-07-18T11:56:58.833Z",
+    "answered_at": "2026-07-18T11:57:26.078Z",
+    "ended_at": "2026-07-18T11:58:53.968Z",
+    "duration_seconds": 88,
+    "recording_path": "718365d2-db46-420c-b228-cdf754665669.webm",
+    "disposition_id": "disp-a81e46c2-83c9-4a65-a9de-c903258a9302",
+    "ended_by": "agent"
+  },
+  {
+    "id": "cb71d87a-e027-4309-9e4c-91bf6072a757",
+    "customer_id": "cust-1",
+    "agent_id": "agent-1",
+    "product_id": "product-1",
+    "status": "completed",
+    "started_at": "2026-07-18T13:17:01.459Z",
+    "answered_at": "2026-07-18T13:18:39.583Z",
+    "ended_at": "2026-07-18T13:21:26.986Z",
+    "duration_seconds": 167,
+    "recording_path": "cb71d87a-e027-4309-9e4c-91bf6072a757.webm",
+    "disposition_id": "disp-2ece53b3-4c48-45b8-8adc-6377fb7cdaab",
+    "ended_by": "admin"
+  }
+]

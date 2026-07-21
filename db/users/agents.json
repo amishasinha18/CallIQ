@@ -1,0 +1,22 @@
+[
+  {
+    "id": "agent-1",
+    "name": "Agent One",
+    "email": "agc1@gmail.com",
+    "password": "123456",
+    "role": "agent",
+    "status": "offline",
+    "last_idle_at": "2026-07-18T13:21:41.385Z",
+    "created_at": "2026-07-18T00:00:00.000Z"
+  },
+  {
+    "id": "agent-2",
+    "name": "Agent Two",
+    "email": "agc2@gmail.com",
+    "password": "123456",
+    "role": "agent",
+    "status": "offline",
+    "last_idle_at": null,
+    "created_at": "2026-07-18T00:00:00.000Z"
+  }
+]

@@ -1,0 +1,34 @@
+[
+  {
+    "id": "product-1",
+    "name": "Enterprise Cloud Hosting",
+    "description": "Scalable managed cloud hosting with 24/7 infrastructure support.",
+    "price": 499,
+    "image": "/images/products/enterprise-cloud-hosting.png",
+    "created_at": "2026-07-18T00:00:00.000Z"
+  },
+  {
+    "id": "product-2",
+    "name": "Premium Support Plan",
+    "description": "Priority technical support with guaranteed response times.",
+    "price": 149,
+    "image": "/images/products/premium-support-plan.png",
+    "created_at": "2026-07-18T00:00:00.000Z"
+  },
+  {
+    "id": "product-3",
+    "name": "Enterprise Security Suite",
+    "description": "Advanced threat detection, monitoring, and compliance tooling.",
+    "price": 699,
+    "image": "/images/products/enterprise-security-suite.png",
+    "created_at": "2026-07-18T00:00:00.000Z"
+  },
+  {
+    "id": "product-4",
+    "name": "Business Analytics Tool",
+    "description": "Real-time dashboards and reporting for business intelligence.",
+    "price": 299,
+    "image": "/images/products/business-analytics-tool.png",
+    "created_at": "2026-07-18T00:00:00.000Z"
+  }
+]

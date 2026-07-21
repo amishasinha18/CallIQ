@@ -1,0 +1,112 @@
+[
+  {
+    "id": "msg-aa0d1cc7-cdc7-4eb3-95e2-9dd248317845",
+    "chat_id": "chat-b02e2709-b67c-464b-adf0-000b2061e55d",
+    "sender_role": "customer",
+    "sender_id": "cust-1",
+    "sender_name": "Amisha",
+    "text": "hii",
+    "created_at": "2026-07-18T12:02:50.116Z"
+  },
+  {
+    "id": "msg-6815becf-51d0-41d9-a6a1-8b02f521842e",
+    "chat_id": "chat-b02e2709-b67c-464b-adf0-000b2061e55d",
+    "sender_role": "agent",
+    "sender_id": "agent-1",
+    "sender_name": "Agent One",
+    "text": "hi",
+    "created_at": "2026-07-18T12:02:52.613Z"
+  },
+  {
+    "id": "msg-9f994caf-7f57-48b1-a81d-18edddbf0d1f",
+    "chat_id": "chat-b02e2709-b67c-464b-adf0-000b2061e55d",
+    "sender_role": "agent",
+    "sender_id": "agent-1",
+    "sender_name": "Agent One",
+    "type": "quotation",
+    "quotation_id": "quote-2aa7be2e-e09e-4ea1-bed5-ca3d0f7c1cd8",
+    "text": "Sent a quotation for Enterprise Cloud Hosting",
+    "created_at": "2026-07-18T12:02:56.632Z"
+  },
+  {
+    "id": "msg-6bd1118f-7aa3-400f-bfee-d57564e28c57",
+    "chat_id": "chat-2d74049b-49c8-49a2-a742-4dcfce67ea34",
+    "sender_role": "agent",
+    "sender_id": "agent-1",
+    "sender_name": "Agent One",
+    "text": "hi",
+    "created_at": "2026-07-18T12:06:34.565Z"
+  },
+  {
+    "id": "msg-fc816211-563f-406c-ac18-962c3d789858",
+    "chat_id": "chat-2d74049b-49c8-49a2-a742-4dcfce67ea34",
+    "sender_role": "customer",
+    "sender_id": "cust-1",
+    "sender_name": "Amisha",
+    "text": "hi",
+    "created_at": "2026-07-18T12:06:36.303Z"
+  },
+  {
+    "id": "msg-e9b15c70-b9d6-465c-a6fb-8472680c7c42",
+    "chat_id": "chat-2d74049b-49c8-49a2-a742-4dcfce67ea34",
+    "sender_role": "agent",
+    "sender_id": "agent-1",
+    "sender_name": "Agent One",
+    "text": "such a graet dday\\",
+    "created_at": "2026-07-18T12:06:45.399Z"
+  },
+  {
+    "id": "msg-10da9d7d-ef0f-4e40-a1f2-2cce6ab8a1a7",
+    "chat_id": "chat-2d74049b-49c8-49a2-a742-4dcfce67ea34",
+    "sender_role": "agent",
+    "sender_id": "agent-1",
+    "sender_name": "Agent One",
+    "text": "\\",
+    "created_at": "2026-07-18T12:06:45.424Z"
+  },
+  {
+    "id": "msg-2a9d60f3-3069-4fd4-9ff5-fc6f017b3d55",
+    "chat_id": "chat-2d74049b-49c8-49a2-a742-4dcfce67ea34",
+    "sender_role": "agent",
+    "sender_id": "agent-1",
+    "sender_name": "Agent One",
+    "text": "hjsdbvoPCw4hjfvb",
+    "created_at": "2026-07-18T12:06:49.862Z"
+  },
+  {
+    "id": "msg-c4966166-b501-41dc-a123-b3a33531a3d9",
+    "chat_id": "chat-2d74049b-49c8-49a2-a742-4dcfce67ea34",
+    "sender_role": "agent",
+    "sender_id": "agent-1",
+    "sender_name": "Agent One",
+    "text": "HJFBVKd,",
+    "created_at": "2026-07-18T12:06:50.376Z"
+  },
+  {
+    "id": "msg-a16c886d-b7d8-4c3a-8690-0ad31d38ca04",
+    "chat_id": "chat-2d74049b-49c8-49a2-a742-4dcfce67ea34",
+    "sender_role": "agent",
+    "sender_id": "agent-1",
+    "sender_name": "Agent One",
+    "text": "sfdv'[W;BDSVM",
+    "created_at": "2026-07-18T12:06:51.119Z"
+  },
+  {
+    "id": "msg-2066de91-3a73-4348-9745-ac69e263cb19",
+    "chat_id": "chat-2d74049b-49c8-49a2-a742-4dcfce67ea34",
+    "sender_role": "agent",
+    "sender_id": "agent-1",
+    "sender_name": "Agent One",
+    "text": "Dllhsd'v[BHJVBDS'",
+    "created_at": "2026-07-18T12:06:52.785Z"
+  },
+  {
+    "id": "msg-be3d690f-b86f-4e0a-9222-4e8e1823b268",
+    "chat_id": "chat-64e321bf-1ae0-47ac-84f2-4d3d5a291995",
+    "sender_role": "agent",
+    "sender_id": "agent-1",
+    "sender_name": "Agent One",
+    "text": "fve",
+    "created_at": "2026-07-18T12:07:22.840Z"
+  }
+]

@@ -1,0 +1,80 @@
+[
+  {
+    "id": "chat-852a9511-3861-45dc-bfe7-f4122bf87a78",
+    "customer_id": "cust-1",
+    "customer_name": "Amisha",
+    "product_id": "product-1",
+    "product_name": "Enterprise Cloud Hosting",
+    "status": "CLOSED",
+    "agent_id": null,
+    "transfer_history": [],
+    "created_at": "2026-07-18T12:01:10.131Z",
+    "assigned_at": null,
+    "closed_at": "2026-07-18T12:02:33.863Z"
+  },
+  {
+    "id": "chat-304dbfb9-8c8b-4360-ba50-4536dab593e7",
+    "customer_id": "cust-1",
+    "customer_name": "Amisha",
+    "product_id": "product-1",
+    "product_name": "Enterprise Cloud Hosting",
+    "status": "CLOSED",
+    "agent_id": null,
+    "transfer_history": [],
+    "created_at": "2026-07-18T12:02:35.544Z",
+    "assigned_at": null,
+    "closed_at": "2026-07-18T12:02:40.235Z"
+  },
+  {
+    "id": "chat-b02e2709-b67c-464b-adf0-000b2061e55d",
+    "customer_id": "cust-1",
+    "customer_name": "Amisha",
+    "product_id": "product-1",
+    "product_name": "Enterprise Cloud Hosting",
+    "status": "CLOSED",
+    "agent_id": "agent-1",
+    "transfer_history": [],
+    "created_at": "2026-07-18T12:02:42.673Z",
+    "assigned_at": "2026-07-18T12:02:44.917Z",
+    "closed_at": "2026-07-18T12:03:03.988Z"
+  },
+  {
+    "id": "chat-62efa6ee-ac69-4e86-86d1-4819c11ac163",
+    "customer_id": "cust-1",
+    "customer_name": "Amisha",
+    "product_id": "product-1",
+    "product_name": "Enterprise Cloud Hosting",
+    "status": "CLOSED",
+    "agent_id": "agent-1",
+    "transfer_history": [],
+    "created_at": "2026-07-18T12:03:12.432Z",
+    "assigned_at": "2026-07-18T12:03:14.317Z",
+    "closed_at": "2026-07-18T12:03:23.156Z"
+  },
+  {
+    "id": "chat-2d74049b-49c8-49a2-a742-4dcfce67ea34",
+    "customer_id": "cust-1",
+    "customer_name": "Amisha",
+    "product_id": "product-1",
+    "product_name": "Enterprise Cloud Hosting",
+    "status": "CLOSED",
+    "agent_id": "agent-1",
+    "transfer_history": [],
+    "created_at": "2026-07-18T12:06:26.012Z",
+    "assigned_at": "2026-07-18T12:06:31.217Z",
+    "closed_at": "2026-07-18T12:06:55.417Z"
+  },
+  {
+    "id": "chat-64e321bf-1ae0-47ac-84f2-4d3d5a291995",
+    "customer_id": "cust-1",
+    "customer_name": "Amisha",
+    "product_id": "product-1",
+    "product_name": "Enterprise Cloud Hosting",
+    "status": "CLOSED",
+    "agent_id": "agent-1",
+    "transfer_history": [],
+    "created_at": "2026-07-18T12:07:06.454Z",
+    "assigned_at": "2026-07-18T12:07:17.233Z",
+    "closed_at": "2026-07-18T12:07:25.136Z"
+  }
+]

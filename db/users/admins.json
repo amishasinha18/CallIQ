@@ -1,0 +1,10 @@
+[
+  {
+    "id": "admin-1",
+    "name": "Platform Admin",
+    "email": "admin@platform.com",
+    "password": "admin@123",
+    "role": "admin",
+    "created_at": "2026-07-18T00:00:00.000Z"
+  }
+]

@@ -1,0 +1,26 @@
+[
+  {
+    "id": "cust-1",
+    "name": "Amisha",
+    "email": "amisha@gmail.com",
+    "password": "123456",
+    "role": "customer",
+    "created_at": "2026-07-18T00:00:00.000Z"
+  },
+  {
+    "id": "cust-2",
+    "name": "Stark",
+    "email": "stark@gkmail.com",
+    "password": "123456",
+    "role": "customer",
+    "created_at": "2026-07-18T00:00:00.000Z"
+  },
+  {
+    "id": "cust-3",
+    "name": "Tesla",
+    "email": "tesla@gmail.com",
+    "password": "123456",
+    "role": "customer",
+    "created_at": "2026-07-18T00:00:00.000Z"
+  }
+]
