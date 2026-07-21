@@ -11,54 +11,43 @@ Listen/Whisper/Barge/Hangup live calls from an analytics dashboard.
 
 | Service   | Path      | Port  | Notes                                             |
 |-----------|-----------|-------|----------------------------------------------------|
-| LiveKit   | `livekit/`| 7880  | Self-hosted SFU, dev mode, keys `devkey`/`secret`  |
 | Backend   | `server/` | 4100  | Express + Socket.io signaling/API                  |
 | Frontend  | `web/`    | 4200  | Next.js (App Router) + Tailwind + Zustand          |
-| Redis     | system    | 6379  | Agent idle-ranking (no queue anymore)              |
-| Data      | `db/`     | —     | JSON-file mock DB (see below)                      |
-| Recordings| `recordings/` | — | Client-recorded call audio, uploaded on hangup |
+| Database  | Supabase  | —     | Managed Postgres — see `server/db/schema.sql`      |
+| Storage   | Supabase  | —     | Two buckets: `recordings` (private), `product-images` (public) |
+| Redis     | Upstash   | —     | Agent idle-ranking / presence (TLS, `rediss://`)   |
+| WebRTC    | LiveKit Cloud | — | Managed SFU — no self-hosted media server anymore  |
 
-Ports 3000/3010/4000/5000/5173/5174 are already in use by other apps on this
-box — that's why the backend runs on 4100 and the frontend on 4200.
+There is no local self-hosted infrastructure left to run — every backing
+service above is a managed cloud product, and local dev connects to the same
+Supabase/LiveKit Cloud/Upstash projects as the deployed app. The repo still
+has a `livekit/` directory and an `ecosystem.config.js` `cc-livekit` pm2 app
+from an earlier self-hosted-LiveKit iteration — both are unused/vestigial
+now and safe to ignore (or delete, if you want to tidy up).
 
-## Running it
-
-All three services run under pm2 (`ecosystem.config.js` at the repo root):
+## Running it locally
 
 ```bash
-pm2 start ecosystem.config.js   # first time
-pm2 restart cc-livekit cc-server cc-web   # after changing .env / .env.local
-pm2 logs cc-server               # tail logs for one service
-pm2 list                         # status
+cp server/.env.example server/.env        # fill in real Supabase/LiveKit Cloud/Upstash values
+cd server && npm install
+node scripts/migrate-to-postgres.js       # one-time: loads db/*.json into Postgres
+cd ../web && npm install
+cd .. && pm2 start ecosystem.config.js
+pm2 restart cc-server cc-web              # after changing .env / .env.local
+pm2 logs cc-server                        # tail logs for one service
 ```
 
-Local: http://localhost:4200. Public link (Cloudflare quick tunnels, see
-caveat below): https://cet-jackson-cards-dvd.trycloudflare.com
+`server/.env` requires `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
+`REDIS_URL`, `LIVEKIT_URL`, `LIVEKIT_HTTP_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`
+— see the README's "Getting Started" table for where each one comes from.
 
-Three separate `cloudflared tunnel --url http://localhost:<port>` processes
-(4200 web, 4100 backend, 7880 LiveKit) are running outside pm2 — quick
-tunnels hand out a **new random URL every time they restart, and can drop
-on their own with no warning** (has happened repeatedly during development,
-sometimes all three at once). Putting them under pm2's auto-restart would
-silently break shared links, so they're managed manually. If a tunnel dies
-(`curl` the URL — a Cloudflare 530 means it's dead, or a DNS resolution
-failure means it's gone entirely), restart it and update `web/.env.local` /
-`server/.env` (`NEXT_PUBLIC_API_URL`/`NEXT_PUBLIC_LIVEKIT_URL`,
-`LIVEKIT_URL`, `CORS_ORIGIN` — `CORS_ORIGIN` is comma-separated and must
-keep `http://localhost:4200` in the list for local dev to keep working),
-then `pm2 restart cc-server cc-web`.
-
-**Public link caveat**: login, product grid, routing, chat, admin dashboard,
-disposition, quotation (PDF included), feedback, and recording playback all
-work fully over the public link. Live audio/video is verified working for
-this environment, but has not been proven from a genuinely different
-network — this self-hosted LiveKit has no TURN relay configured (the TURN
-server already running on this box belongs to an unrelated project and
-wasn't reused), so a visitor behind restrictive NAT/firewall may fail to
-establish the media connection even though everything else works. This box
-is also shared with several unrelated projects competing for CPU/memory —
-expect occasional transient WebRTC connection hiccups under load; that's
-environmental, not a platform bug.
+**Supabase direct-connection gotcha**: `db.<project-ref>.supabase.co` (the
+"direct connection" string Supabase shows first) resolves to an IPv6-only
+address on the free tier. If your network/host has no IPv6 egress (this
+bit us once), that connection fails with `ENETUNREACH`. Use the
+**Connection pooling** URI instead (`aws-0-<region>.pooler.supabase.com`,
+port 6543, username `postgres.<project-ref>`) — it's IPv4-compatible and is
+what both local dev and the Render deploy should use.
 
 ## Login
 
@@ -67,14 +56,15 @@ environmental, not a platform bug.
 (unique across the whole platform in the seed data) to figure out the role
 itself; the frontend redirects based on whatever role comes back. The
 landing page (`/`) is a single-page CallIQ marketing site with Login/Sign Up
-as modals — Sign Up is customer self-registration only, exactly as before;
-agent/admin accounts are still admin-provisioned.
+as modals — Sign Up is customer self-registration only; agent/admin accounts
+are still admin-provisioned.
 
 ## Seed accounts
 
 | Role     | Email                | Password    |
 |----------|-----------------------|-------------|
 | Admin    | admin@platform.com    | admin@123   |
+| Admin    | admin@calliq.com      | Admin@1234  |
 | Agent    | agc1@gmail.com        | 123456      |
 | Agent    | agc2@gmail.com        | 123456      |
 | Customer | amisha@gmail.com      | 123456      |
@@ -83,9 +73,41 @@ agent/admin accounts are still admin-provisioned.
 
 An agent must set their status to **Available** before they can receive calls.
 
+## Live supervision (Listen / Whisper / Barge)
+
+- **Listen**: admin joins the call's main LiveKit room hidden, subscribe-only
+  — fully silent/invisible monitor, no server-side state to unwind on exit.
+- **Barge**: admin joins the same room fully (publish+subscribe) as a visible
+  third participant. Both customer and agent see an "A supervisor has joined
+  this call" banner. Closing the modal now calls `POST /calls/:id/monitor/stop`
+  (`mode: 'barge'`), which emits `call:supervisorLeft` to both parties so the
+  banner actually clears — it used to stay up forever, since nothing ever told
+  either side the admin had left.
+- **Whisper**: admin joins a second, separate LiveKit room (`call-<id>-whisper`)
+  that the agent silently joined the instant the call connected. Starting a
+  whisper server-authoritatively flips the agent's publish permission on in
+  that room (`RoomServiceClient.updateParticipant`, not a static token grant —
+  so a modified client can't self-unmute), mutes the agent's mic in the main
+  room (so the customer hears nothing), and puts the customer on an indefinite
+  "You're on hold" screen (`OnHoldOverlay.js`). Closing the whisper modal calls
+  `stop` the same way, which reverses all of it and resumes the normal call.
+  This used to be one-way and had no stop path at all — see
+  `server/src/calls/livekitService.js` / `callService.js` for the full
+  start/stop implementation.
+- **Historical whisper bug** (already fixed, keep the fix in mind if touching
+  this code): both whisper-room participants originally had `hidden: true`
+  grants. LiveKit's `hidden` flag suppresses participant-announce signaling to
+  other hidden participants while the SFU still forwards the raw media track,
+  so the agent's client received a WebRTC track it could never map to a known
+  participant and silently dropped it. Fixed by removing `hidden` (the whisper
+  room is already private by being a separate room the customer never joins)
+  and having the agent join it silently at call-connect time rather than at
+  whisper-request time, so a later admin join is a well-tested "existing
+  participant, new arrival" path.
+
 ## Text chat
 
-Parallel to voice: `db/chats/{chats,messages}.json`, `server/src/chats/`.
+Parallel to voice: `chats`/`messages` tables, `server/src/chats/`.
 Ring-all broadcasts a `chat:request` to every online agent assigned to the
 product; first `chat:accept` wins via a Redis `SET NX` lock, everyone else
 gets `chat:claimed` (retracted from their pending list) or a "Already
@@ -117,13 +139,10 @@ business before this leaves demo status. There's still no SMTP wired up, so
 
 `GET /admin/stats` aggregates calls-today, chats-today, avg call duration,
 completion rate, a 7-day call-volume trend, disposition breakdown, live
-agent-status breakdown, and avg customer feedback rating — all computed
-from the JSON repos on request (fine at this scale; revisit if `db/`
-outgrows in-request aggregation). Charts are `recharts`, built per the
-`dataviz` skill's method (validated palette, status colors reserved for
-state, one hue for magnitude, direct labels, dark mode independently
-validated — see `references/palette.md` in that skill for the exact hex
-values in use).
+agent-status breakdown, and avg customer feedback rating, computed on
+request from Postgres. Charts are `recharts`, built per the `dataviz`
+skill's method (validated palette, status colors reserved for state, one hue
+for magnitude, direct labels, dark mode independently validated).
 
 ## Feedback
 
@@ -132,40 +151,82 @@ watches `callStore.status === 'ended'`, mirroring how the agent's mandatory
 disposition modal is triggered). Four fixed 1–5 star parameters (Agent
 Professionalism, Call Quality, Issue Resolution, Overall Experience) plus a
 comment, `POST /calls/:id/feedback`, one per call. Skippable — not mandatory
-like the agent's disposition.
+like the agent's disposition. Feeds both the admin dashboard's aggregate
+rating and each agent's own personalized stats panel.
+
+## Product images
+
+Admins upload a photo per product (create form or per-row "Upload image" in
+`ProductsTab.js`); stored in the `product-images` Supabase Storage bucket
+(public), served via `GET /products/:id/image`, which 302-redirects to the
+object's public URL rather than proxying bytes through Express — the bucket
+is public and non-sensitive, so there's no auth to gate. `ProductCard.js`
+falls back to its original gradient-plus-initial placeholder if `image` is
+null or the file 404s.
 
 ## Data layer
 
-`db/` is a JSON-file mock database (see `server/src/db/`), not real
-PostgreSQL — swap `JsonCollection` for a Prisma repository later without
-touching route/service code. Passwords are plaintext in this mock layer;
-`authService.verifyPassword` accepts either plaintext or a bcrypt hash, but
-anything written going forward (signup, admin-created agents, password
-resets) is bcrypt-hashed. Hash the seed passwords too before this touches
-real users.
+Postgres (Supabase), via `server/src/db/pgCollection.js` — a drop-in
+replacement for the interface `JsonCollection` (still in the repo, unused)
+used to expose: `all/find/findOne/findById/insert/updateById/removeById/
+removeWhere`, now backed by a shared `pg.Pool` instead of a JSON file. Every
+method is `async` (real network I/O), which is the one place this wasn't a
+truly zero-diff swap — every route/service call site needed `await` added.
+
+`db/*.json` is now a **historical snapshot only** — it's what
+`server/scripts/migrate-to-postgres.js` reads to seed a fresh Postgres
+database once; nothing in the running app reads those files anymore.
+
+Two schema/migration gotchas worth knowing if you touch this again:
+- **Circular-ish FKs** (`call_logs.disposition_id` ↔ `dispositions`,
+  `messages.quotation_id` ↔ `quotations`): the JSON snapshot represents
+  *final* state (both sides already linked), but the migration script
+  inserts in a fixed dependency order — so those two FKs are declared
+  `DEFERRABLE INITIALLY DEFERRED` in `server/db/schema.sql`, checked at
+  transaction commit instead of per-statement.
+- **JSONB array columns** (`chats.transfer_history`): `pg`'s default
+  parameter serialization sends a raw JS array as a Postgres *array*
+  literal (`{}` for an empty one), not JSON text — and `{}` happens to also
+  be valid JSON (an empty object), so an empty array silently became an
+  empty object once it landed in a `jsonb` column. Fixed by explicitly
+  `JSON.stringify`-ing any object/array parameter value before binding it
+  (`pgCollection.js`'s `serializeValue`, mirrored in the migration script).
+
+Passwords: `authService.verifyPassword` accepts either plaintext or a bcrypt
+hash, so the original plaintext seed passwords keep working; anything
+written going forward (signup, admin-created agents, password resets, the
+`admin@calliq.com` seed added later) is bcrypt-hashed.
+
+## Deployment
+
+Two Render web services, defined in `render.yaml` at the repo root —
+`calliq-server` (Express/Socket.IO) and `calliq-web` (Next.js). See the
+README's "Deployment" section for the click-through steps. Notable fixes
+made specifically for Render's free tier:
+- `web/package.json`'s `start` script was hardcoded to `-p 4200`; Render
+  injects its own `$PORT` and expects the service to bind to it — fixed to
+  `next start -p ${PORT:-4200}`.
+- Both `package.json`s got `"engines": {"node": ">=20"}` so Render
+  provisions a matching Node version.
+- `@supabase/supabase-js`'s client always constructs a Realtime websocket
+  client internally (even though this app only uses Storage), which throws
+  on Node < 22 without the `ws` package explicitly provided as the
+  transport — see `server/src/storage/supabaseStorage.js`. This would have
+  crashed on Render's Node 20 runtime if left unfixed.
+- Render's free-tier disks are ephemeral (wiped on every restart/redeploy) —
+  this is *why* call recordings and product images live in Supabase Storage
+  instead of local disk now, not just an incidental choice.
 
 ## Known limitations / next steps
 
 - **Outdial** only rings a customer who has an active browser session —
   there's no PSTN/SIP trunk, so it can't call a phone number.
-- **Whisper was broken and is now fixed** — root cause was the
-  `hidden: true` grant on *both* whisper-room participants. LiveKit's
-  `hidden` flag suppresses participant-announce signaling to other hidden
-  participants while the SFU still forwards the raw media track, so the
-  agent's client received a WebRTC track it could never map to a known
-  participant and silently dropped it (logged as "Tried to add a track for
-  a participant, that's not present"). Fixed by removing `hidden` from the
-  whisper grants (`server/src/calls/livekitService.js`) — the whisper room
-  is already private by virtue of being a separate room the customer never
-  joins, so no second layer of hiding was needed inside it. Also
-  restructured so the agent joins the whisper room silently the moment the
-  call connects (not only when an admin requests whisper), so a later
-  whisper join is the well-tested "existing participant, new arrival" path.
-- **Call window** no longer has LiveKit's built-in Chat button (redundant
-  with the platform's own chat) — replaced `<VideoConference/>` with a
-  hand-built layout (`components/CallStage.js`: `useTracks` + `GridLayout` +
-  `ParticipantTile` + a `ControlBar` with `chat`/`leave`/`settings` off) that
-  also adds a live call-duration timer.
+- **Call window** has no LiveKit built-in Chat button (redundant with the
+  platform's own chat) — replaced `<VideoConference/>` with a hand-built
+  layout (`components/CallStage.js`: `useTracks` + `GridLayout` +
+  `ParticipantTile` + a `ControlBar` with `chat`/`leave`/`settings` off, and
+  its `microphone` control gated off during an active whisper) that also
+  adds a live call-duration timer.
 - **Quotation "send"** creates a retrievable/downloadable record (PDF
   included) but isn't emailed — no SMTP service is wired up.
 - **Call state is in-memory**, single Node process — fine for one instance;
@@ -173,17 +234,17 @@ real users.
   instances behind a load balancer.
 - **Recordings are client-side**: the agent's browser mixes its own mic with
   every remote participant's audio via Web Audio, records that with
-  MediaRecorder, and uploads the `.webm` on hangup — there's no
-  server-side LiveKit Egress. If the agent's tab crashes mid-call, the
-  recording is lost. Admin and agent can both play it back from the UI.
+  MediaRecorder, and uploads the `.webm` to Supabase Storage on hangup —
+  there's no server-side LiveKit Egress. If the agent's tab crashes mid-call,
+  the recording is lost.
 - **No waiting room**: if nobody's available, the customer hears ~8s of a
-  generated hold tone (Web Audio oscillator, not a licensed audio asset)
-  and the attempt is logged as `no_agent_available` — they must click
-  "Call" again themselves, there's no auto-callback.
+  generated hold tone (Web Audio oscillator, not a licensed audio asset) and
+  the attempt is logged as `no_agent_available` — they must click "Call"
+  again themselves, there's no auto-callback.
 - **Chat has no persistence-across-reload UI wiring yet**: `GET /chats/:id/messages`
   exists for it, but the frontend doesn't call it on mount — refreshing
   mid-chat loses the visible thread from the store (messages are still safe
-  in `db/chats/messages.json`, just not re-fetched into the UI).
+  in Postgres, just not re-fetched into the UI).
 - **One socket, shared by design**: `web/lib/socketClient.js` hands out a
   single memoized socket.io connection to every hook (`useCallSocket`,
   `useChatSocket`) — don't add a new hook that recreates it based on
@@ -195,3 +256,6 @@ real users.
   was the `hidden` grant), but left off because @livekit/components-react's
   `LiveKitRoom` manages an imperative WebRTC connection that isn't
   idempotent under Strict Mode's dev-only double-invoke of effects.
+- **Deleting a product/recording doesn't clean up its Supabase Storage
+  object** — the DB row goes away but the underlying file is left orphaned
+  in the bucket. Low-cost at this scale; worth a cleanup job later.
