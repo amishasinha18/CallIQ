@@ -24,7 +24,11 @@ export function useCallSocket() {
         const onDeclined = () => store.getState().reset();
         const onError = (e) => console.error('[call:error]', e.message);
         const onSupervisorJoined = () => store.getState().setSupervisorJoined();
+        const onSupervisorLeft = () => store.getState().setSupervisorLeft();
         const onWhisperStart = (payload) => store.getState().setWhisper(payload);
+        const onWhisperActive = (payload) => store.getState().setWhisperActive(payload.active);
+        const onHoldStart = () => store.getState().setOnHold(true);
+        const onHoldEnd = () => store.getState().setOnHold(false);
 
         socket.on('call:ringing', onWaiting);
         socket.on('call:incoming', onIncoming);
@@ -34,7 +38,11 @@ export function useCallSocket() {
         socket.on('call:declined', onDeclined);
         socket.on('call:error', onError);
         socket.on('call:supervisorJoined', onSupervisorJoined);
+        socket.on('call:supervisorLeft', onSupervisorLeft);
         socket.on('call:whisperStart', onWhisperStart);
+        socket.on('call:whisperActive', onWhisperActive);
+        socket.on('call:holdStart', onHoldStart);
+        socket.on('call:holdEnd', onHoldEnd);
 
         return () => {
             socket.off('call:ringing', onWaiting);
@@ -45,7 +53,11 @@ export function useCallSocket() {
             socket.off('call:declined', onDeclined);
             socket.off('call:error', onError);
             socket.off('call:supervisorJoined', onSupervisorJoined);
+            socket.off('call:supervisorLeft', onSupervisorLeft);
             socket.off('call:whisperStart', onWhisperStart);
+            socket.off('call:whisperActive', onWhisperActive);
+            socket.off('call:holdStart', onHoldStart);
+            socket.off('call:holdEnd', onHoldEnd);
         };
     }, [token]);
 

@@ -16,11 +16,11 @@ function isToday(iso) {
 }
 
 router.get('/stats', requireAuth, requireRole('admin'), async (req, res) => {
-    const calls = repos.callLogs.all();
-    const chats = repos.chats.all();
-    const dispositions = repos.dispositions.all();
-    const agents = repos.agents.all();
-    const feedback = repos.feedback.all();
+    const calls = await repos.callLogs.all();
+    const chats = await repos.chats.all();
+    const dispositions = await repos.dispositions.all();
+    const agents = await repos.agents.all();
+    const feedback = await repos.feedback.all();
 
     const callsToday = calls.filter((c) => isToday(c.started_at)).length;
     const chatsToday = chats.filter((c) => isToday(c.created_at)).length;

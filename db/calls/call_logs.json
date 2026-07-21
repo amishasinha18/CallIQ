@@ -26,5 +26,33 @@
     "recording_path": "cb71d87a-e027-4309-9e4c-91bf6072a757.webm",
     "disposition_id": "disp-2ece53b3-4c48-45b8-8adc-6377fb7cdaab",
     "ended_by": "admin"
+  },
+  {
+    "id": "743144fe-bef1-4d2d-853f-97403fb69b17",
+    "customer_id": "cust-1",
+    "agent_id": null,
+    "product_id": "product-1",
+    "status": "no_agent_available",
+    "started_at": "2026-07-21T09:46:53.959Z",
+    "answered_at": null,
+    "ended_at": "2026-07-21T09:46:53.959Z",
+    "duration_seconds": 0,
+    "recording_path": null,
+    "disposition_id": null,
+    "ended_by": "system"
+  },
+  {
+    "id": "4ac6aa41-aa07-4681-9e76-37836ab77d68",
+    "customer_id": "cust-1",
+    "agent_id": "agent-1",
+    "product_id": "product-1",
+    "status": "completed",
+    "started_at": "2026-07-21T09:47:15.984Z",
+    "answered_at": "2026-07-21T09:47:36.946Z",
+    "ended_at": "2026-07-21T09:50:17.236Z",
+    "duration_seconds": 160,
+    "recording_path": "4ac6aa41-aa07-4681-9e76-37836ab77d68.webm",
+    "disposition_id": "disp-9d370d75-ebf6-4c63-88b5-5994f580cdb4",
+    "ended_by": "agent"
   }
 ]

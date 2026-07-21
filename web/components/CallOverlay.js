@@ -1,11 +1,34 @@
 'use client';
 
-import { LiveKitRoom, RoomAudioRenderer } from '@livekit/components-react';
+import { useEffect, useRef } from 'react';
+import { LiveKitRoom, RoomAudioRenderer, useLocalParticipant } from '@livekit/components-react';
 import { Phone, PhoneIncoming } from 'lucide-react';
 import { useCallStore } from '@/lib/store/callStore';
 import HoldMusic from './HoldMusic';
 import CallRecorder from './CallRecorder';
 import CallStage from './CallStage';
+import OnHoldOverlay from './OnHoldOverlay';
+
+/**
+ * Forces the main-room mic off while `muted` is true (agent: while an admin
+ * is whispering; customer: while on hold) and restores whatever it was
+ * before once `muted` goes back to false — not a blind force-true, so a
+ * pre-existing manual mute survives the round trip.
+ */
+function AutoMicGate({ muted }) {
+    const { localParticipant } = useLocalParticipant();
+    const prevEnabledRef = useRef(true);
+    useEffect(() => {
+        if (!localParticipant) return;
+        if (muted) {
+            prevEnabledRef.current = localParticipant.isMicrophoneEnabled;
+            localParticipant.setMicrophoneEnabled(false);
+        } else {
+            localParticipant.setMicrophoneEnabled(prevEnabledRef.current);
+        }
+    }, [muted, localParticipant]);
+    return null;
+}
 
 /**
  * Full-screen overlay covering every non-idle call state: waiting on the
@@ -17,6 +40,9 @@ import CallStage from './CallStage';
 export default function CallOverlay({ socket, role }) {
     const { status, waiting, incoming, noAgent, room, token, livekitUrl, supervisorJoined, callId, reset } =
         useCallStore();
+    const whisperActive = useCallStore((s) => s.whisperActive);
+    const onHold = useCallStore((s) => s.onHold);
+    const muted = role === 'agent' ? whisperActive : onHold;
 
     if (status === 'idle') return null;
 
@@ -88,10 +114,12 @@ export default function CallOverlay({ socket, role }) {
                             style={{ height: '100%' }}
                             onDisconnected={() => {}}
                         >
-                            <CallStage />
+                            <CallStage micDisabled={muted} />
                             <RoomAudioRenderer />
+                            <AutoMicGate muted={muted} />
                             {role === 'agent' && <CallRecorder callId={callId} />}
                         </LiveKitRoom>
+                        {role === 'customer' && onHold && <OnHoldOverlay />}
                     </div>
                     <div className="p-3 bg-slate-900 flex justify-center">
                         <button

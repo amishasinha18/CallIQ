@@ -29,8 +29,8 @@ function emitToAdmins(event, payload) {
 }
 
 /** No agent was available for this attempt — log it as missed and tell the customer to hold. */
-function logNoAgentAvailable({ callId, customerId, productId, productName }) {
-    repos.callLogs.insert({
+async function logNoAgentAvailable({ callId, customerId, productId, productName }) {
+    await repos.callLogs.insert({
         id: callId,
         customer_id: customerId,
         agent_id: null,
@@ -60,13 +60,13 @@ function logNoAgentAvailable({ callId, customerId, productId, productName }) {
  * there is no waiting room.
  */
 async function routeCall({ customerId, customerName, productId }) {
-    const product = repos.products.findById(productId);
+    const product = await repos.products.findById(productId);
     if (!product) throw Object.assign(new Error('Unknown product'), { status: 404 });
 
     const agentId = await agentState.getLongestIdleAgent(productId);
 
     if (!agentId) {
-        logNoAgentAvailable({ callId: uuidv4(), customerId, productId, productName: product.name });
+        await logNoAgentAvailable({ callId: uuidv4(), customerId, productId, productName: product.name });
         return { routed: false };
     }
 
@@ -74,7 +74,7 @@ async function routeCall({ customerId, customerName, productId }) {
 }
 
 async function startRinging({ customerId, customerName, productId, product, agentId }) {
-    const agent = repos.agents.findById(agentId);
+    const agent = await repos.agents.findById(agentId);
     // Pull the agent out of the idle pool immediately so nobody else gets routed to them.
     await agentState.markBusy(agentId);
 
@@ -93,6 +93,8 @@ async function startRinging({ customerId, customerName, productId, product, agen
         answered_at: null,
         ended_at: null,
         monitors: { listen: [], whisper: [], barge: [] },
+        activeWhisperAdminId: null,
+        activeBargeAdminId: null,
     };
     activeCalls.set(callId, session);
 
@@ -111,9 +113,9 @@ async function startRinging({ customerId, customerName, productId, product, agen
 
 /** Agent-initiated callback (outdial) to a specific customer — bypasses routing entirely. */
 async function startOutdial({ agentId, customerId, productId }) {
-    const agent = repos.agents.findById(agentId);
-    const customer = repos.customers.findById(customerId);
-    const product = repos.products.findById(productId);
+    const agent = await repos.agents.findById(agentId);
+    const customer = await repos.customers.findById(customerId);
+    const product = await repos.products.findById(productId);
     if (!agent || !customer || !product) {
         throw Object.assign(new Error('Agent, customer, or product not found'), { status: 404 });
     }
@@ -135,6 +137,8 @@ async function startOutdial({ agentId, customerId, productId }) {
         answered_at: null,
         ended_at: null,
         monitors: { listen: [], whisper: [], barge: [] },
+        activeWhisperAdminId: null,
+        activeBargeAdminId: null,
     };
     activeCalls.set(callId, session);
 
@@ -170,8 +174,8 @@ async function acceptCall(callId, role, userId) {
     session.status = 'connected';
     session.answered_at = new Date().toISOString();
 
-    const customer = repos.customers.findById(session.customer_id);
-    const agent = repos.agents.findById(session.agent_id);
+    const customer = await repos.customers.findById(session.customer_id);
+    const agent = await repos.agents.findById(session.agent_id);
     const [customerToken, agentToken, agentWhisperToken] = await Promise.all([
         livekit.customerToken(callId, customer),
         livekit.agentToken(callId, agent),
@@ -224,7 +228,7 @@ async function declineCall(callId, decliningRole, decliningUserId) {
     if (session.direction === 'outbound') {
         // Customer declined the agent's callback — just log it, nothing to reroute.
         await agentState.setStatus(session.agent_id, 'available');
-        repos.callLogs.insert({
+        await repos.callLogs.insert({
             id: callId,
             customer_id: session.customer_id,
             agent_id: session.agent_id,
@@ -245,7 +249,7 @@ async function declineCall(callId, decliningRole, decliningUserId) {
     // Look for a replacement BEFORE freeing the decliner — otherwise, on a product with
     // only one assigned agent, they'd immediately be re-routed to their own declined call.
     const nextAgentId = await agentState.getLongestIdleAgent(session.product_id);
-    const product = repos.products.findById(session.product_id);
+    const product = await repos.products.findById(session.product_id);
     await agentState.setStatus(session.agent_id, 'available');
 
     if (nextAgentId) {
@@ -257,7 +261,7 @@ async function declineCall(callId, decliningRole, decliningUserId) {
             agentId: nextAgentId,
         });
     } else {
-        logNoAgentAvailable({
+        await logNoAgentAvailable({
             callId,
             customerId: session.customer_id,
             productId: session.product_id,
@@ -276,7 +280,7 @@ async function endCall(callId, endedBy) {
         (new Date(session.ended_at) - new Date(session.answered_at || session.started_at)) / 1000
     );
 
-    const callLog = repos.callLogs.insert({
+    const callLog = await repos.callLogs.insert({
         id: callId,
         customer_id: session.customer_id,
         agent_id: session.agent_id,
@@ -317,6 +321,7 @@ async function startMonitor(callId, admin, mode) {
 
     if (mode === 'barge') {
         session.monitors.barge.push(admin.id);
+        session.activeBargeAdminId = admin.id;
         const token = await livekit.adminBargeToken(callId, admin);
         emitToCustomer(session.customer_id, 'call:supervisorJoined', { callId });
         emitToAgent(session.agent_id, 'call:supervisorJoined', { callId });
@@ -324,16 +329,62 @@ async function startMonitor(callId, admin, mode) {
     }
 
     if (mode === 'whisper') {
+        // Flip the agent's whisper-room publish permission on BEFORE telling anyone —
+        // if this throws (LiveKit unreachable, etc.) nothing about the call/hold state
+        // should change, and the admin sees the error via their existing catch handler.
+        await livekit.setAgentWhisperPublish(callId, `agent:${session.agent_id}:whisper`, true);
+
         session.monitors.whisper.push(admin.id);
+        session.activeWhisperAdminId = admin.id;
+
         // The agent already joined this room silently when the call connected
         // (see acceptCall) — they're a stable, long-established participant by now,
         // so the admin joining is just the standard "existing participant sees a
         // new one arrive" path rather than a risky simultaneous two-party join.
         const adminToken = await livekit.adminWhisperToken(callId, admin);
+
+        // Agent first (they need to be unmuted before the conversation starts),
+        // then the customer (being silenced a beat later costs nothing).
+        emitToAgent(session.agent_id, 'call:whisperActive', { callId, active: true });
+        emitToCustomer(session.customer_id, 'call:holdStart', { callId });
+
         return { room: livekit.whisperRoom(callId), token: adminToken, livekitUrl: process.env.LIVEKIT_URL };
     }
 
     throw Object.assign(new Error('Unknown monitor mode'), { status: 400 });
+}
+
+/** Reverse of startMonitor's whisper/barge branches — puts the call visuals back to normal. */
+async function stopMonitor(callId, admin, mode) {
+    const session = activeCalls.get(callId);
+    if (!session || session.status !== 'connected') {
+        throw Object.assign(new Error('Call is not active'), { status: 409 });
+    }
+
+    if (mode === 'whisper') {
+        // Stale/duplicate stop (e.g. a second admin's modal, or a late retry) — ignore.
+        if (session.activeWhisperAdminId !== admin.id) return { ok: true };
+
+        session.activeWhisperAdminId = null;
+        await livekit.setAgentWhisperPublish(callId, `agent:${session.agent_id}:whisper`, false);
+        emitToAgent(session.agent_id, 'call:whisperActive', { callId, active: false });
+        emitToCustomer(session.customer_id, 'call:holdEnd', { callId });
+    }
+
+    if (mode === 'barge') {
+        // Same staleness guard — ignore a stop that doesn't match the admin who's actually in.
+        if (session.activeBargeAdminId !== admin.id) return { ok: true };
+
+        session.activeBargeAdminId = null;
+        // Without this, "A supervisor has joined this call" stays up on both sides forever —
+        // there was previously no signal at all telling either party the admin had left.
+        emitToCustomer(session.customer_id, 'call:supervisorLeft', { callId });
+        emitToAgent(session.agent_id, 'call:supervisorLeft', { callId });
+    }
+
+    // listen: no server-side state to unwind — it never touched customer/agent state,
+    // closing the modal already fully disconnects the admin's own room connection.
+    return { ok: true };
 }
 
 function getLiveCalls() {
@@ -352,6 +403,7 @@ module.exports = {
     declineCall,
     endCall,
     startMonitor,
+    stopMonitor,
     getLiveCalls,
     getCall,
 };

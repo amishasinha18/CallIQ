@@ -1,7 +1,6 @@
 'use strict';
 
 require('dotenv').config();
-const path = require('path');
 
 module.exports = {
     port: process.env.PORT || 4000,
@@ -20,6 +19,10 @@ module.exports = {
         ? process.env.CORS_ORIGIN.split(',').map((s) => s.trim())
         : '*',
 
-    dbDir: path.join(__dirname, '..', '..', '..', 'db'),
-    recordingsDir: path.join(__dirname, '..', '..', '..', 'recordings'),
+    databaseUrl: process.env.DATABASE_URL,
+
+    supabaseUrl: process.env.SUPABASE_URL,
+    supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    supabaseRecordingsBucket: process.env.SUPABASE_RECORDINGS_BUCKET || 'recordings',
+    supabaseProductImagesBucket: process.env.SUPABASE_PRODUCT_IMAGES_BUCKET || 'product-images',
 };

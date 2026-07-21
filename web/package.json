@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "next dev -p 4200",
     "build": "next build",
-    "start": "next start -p 4200"
+    "start": "next start -p ${PORT:-4200}"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "dependencies": {
     "@livekit/components-react": "^2.9.23",

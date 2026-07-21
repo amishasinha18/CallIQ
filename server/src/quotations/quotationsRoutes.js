@@ -16,8 +16,8 @@ function canView(quotation, user) {
 }
 
 // List: admin sees all, agent sees the ones they created, customer sees the ones sent to them.
-router.get('/', requireAuth, requireRole('admin', 'agent', 'customer'), (req, res) => {
-    let list = repos.quotations.all();
+router.get('/', requireAuth, requireRole('admin', 'agent', 'customer'), async (req, res) => {
+    let list = await repos.quotations.all();
     if (req.user.role === 'agent') list = list.filter((q) => q.agent_id === req.user.sub);
     if (req.user.role === 'customer') list = list.filter((q) => q.customer_id === req.user.sub);
     res.json(list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
@@ -30,7 +30,7 @@ router.get('/', requireAuth, requireRole('admin', 'agent', 'customer'), (req, re
  * the record exists and is retrievable/downloadable, not that it was
  * actually emailed.
  */
-router.post('/', requireAuth, requireRole('agent'), (req, res) => {
+router.post('/', requireAuth, requireRole('agent'), async (req, res) => {
     const { callLogId, chatId } = req.body;
 
     let productId;
@@ -38,12 +38,12 @@ router.post('/', requireAuth, requireRole('agent'), (req, res) => {
     let sourceChatId = null;
 
     if (callLogId) {
-        const log = repos.callLogs.findById(callLogId);
+        const log = await repos.callLogs.findById(callLogId);
         if (!log || log.agent_id !== req.user.sub) return res.status(404).json({ error: 'Call log not found' });
         productId = log.product_id;
         customerId = log.customer_id;
     } else if (chatId) {
-        const chat = repos.chats.findById(chatId);
+        const chat = await repos.chats.findById(chatId);
         if (!chat || chat.agent_id !== req.user.sub) return res.status(404).json({ error: 'Chat not found' });
         productId = chat.product_id;
         customerId = chat.customer_id;
@@ -52,11 +52,11 @@ router.post('/', requireAuth, requireRole('agent'), (req, res) => {
         return res.status(400).json({ error: 'callLogId or chatId is required' });
     }
 
-    const product = repos.products.findById(productId);
-    const customer = repos.customers.findById(customerId);
+    const product = await repos.products.findById(productId);
+    const customer = await repos.customers.findById(customerId);
     if (!product || !customer) return res.status(404).json({ error: 'Product or customer not found' });
 
-    const quotation = repos.quotations.insert({
+    const quotation = await repos.quotations.insert({
         id: `quote-${uuidv4()}`,
         call_log_id: callLogId || null,
         chat_id: sourceChatId,
@@ -77,7 +77,7 @@ router.post('/', requireAuth, requireRole('agent'), (req, res) => {
 
     if (sourceChatId) {
         // Render as a real chat message (persisted, shows in the thread for both parties).
-        const message = repos.chatMessages.insert({
+        const message = await repos.chatMessages.insert({
             id: `msg-${uuidv4()}`,
             chat_id: sourceChatId,
             sender_role: 'agent',
@@ -95,30 +95,30 @@ router.post('/', requireAuth, requireRole('agent'), (req, res) => {
     res.status(201).json(quotation);
 });
 
-router.get('/:id', requireAuth, requireRole('admin', 'agent', 'customer'), (req, res) => {
-    const quotation = repos.quotations.findById(req.params.id);
+router.get('/:id', requireAuth, requireRole('admin', 'agent', 'customer'), async (req, res) => {
+    const quotation = await repos.quotations.findById(req.params.id);
     if (!quotation) return res.status(404).json({ error: 'Quotation not found' });
     if (!canView(quotation, req.user)) return res.status(403).json({ error: 'Forbidden' });
     res.json(quotation);
 });
 
-router.get('/:id/pdf', requireAuth, requireRole('admin', 'agent', 'customer'), (req, res) => {
-    const quotation = repos.quotations.findById(req.params.id);
+router.get('/:id/pdf', requireAuth, requireRole('admin', 'agent', 'customer'), async (req, res) => {
+    const quotation = await repos.quotations.findById(req.params.id);
     if (!quotation) return res.status(404).json({ error: 'Quotation not found' });
     if (!canView(quotation, req.user)) return res.status(403).json({ error: 'Forbidden' });
     renderQuotationPdf(quotation, res);
 });
 
 function respondToQuotation(status) {
-    return (req, res) => {
-        const quotation = repos.quotations.findById(req.params.id);
+    return async (req, res) => {
+        const quotation = await repos.quotations.findById(req.params.id);
         if (!quotation || quotation.customer_id !== req.user.sub) {
             return res.status(404).json({ error: 'Quotation not found' });
         }
         if (quotation.status !== 'pending') {
             return res.status(409).json({ error: `Quotation already ${quotation.status}` });
         }
-        const updated = repos.quotations.updateById(req.params.id, { status });
+        const updated = await repos.quotations.updateById(req.params.id, { status });
         emitter.emitToUser('agent', quotation.agent_id, `quotation:${status}`, updated);
         if (quotation.chat_id) {
             emitter.emitToUser('agent', quotation.agent_id, 'chat:quotationUpdated', { chatId: quotation.chat_id, quotation: updated });

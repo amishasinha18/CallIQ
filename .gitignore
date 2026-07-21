@@ -18,6 +18,8 @@ livekit/logs/
 # Runtime data
 recordings/*
 !recordings/.gitkeep
+product-images/*
+!product-images/.gitkeep
 
 # Logs
 *.log

@@ -15,7 +15,9 @@ const initialState = {
     incoming: null, // { callId, customerName, productName } (agent) | { callId, agentName, productName, outbound } (customer)
     // Nobody was available to take the call — hold music plays, then it hangs up on its own.
     noAgent: null, // { callId, productName }
-    whisper: null, // { room, token } — agent only, set when admin whispers
+    whisper: null, // { room, token } — agent only, standby whisper-room connection joined at call-connect
+    whisperActive: false, // agent only — true only while an admin's whisper is actually live
+    onHold: false, // customer only — true while an admin is whispering to the agent
     supervisorJoined: false,
     lastEndedBy: null,
 };
@@ -44,6 +46,9 @@ export const useCallStore = create((set) => ({
             lastEndedBy: endedBy,
         })),
     setWhisper: (payload) => set({ whisper: payload }),
+    setWhisperActive: (active) => set({ whisperActive: active }),
+    setOnHold: (onHold) => set({ onHold }),
     setSupervisorJoined: () => set({ supervisorJoined: true }),
+    setSupervisorLeft: () => set({ supervisorJoined: false }),
     reset: () => set(initialState),
 }));

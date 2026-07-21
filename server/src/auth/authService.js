@@ -46,9 +46,9 @@ function sanitize(user) {
  * all three tables (assumes unique email per account across the whole
  * platform, true today) and verify the password against whichever matches.
  */
-function login(email, password) {
+async function login(email, password) {
     for (const [role, repo] of Object.entries(REPO_BY_ROLE)) {
-        const user = repo.findOne((u) => u.email.toLowerCase() === String(email).toLowerCase());
+        const user = await repo.findOne((u) => u.email.toLowerCase() === String(email).toLowerCase());
         if (user && verifyPassword(password, user.password)) {
             const token = issueToken(user, role);
             return { token, user: { ...sanitize(user), role } };
@@ -57,11 +57,11 @@ function login(email, password) {
     throw Object.assign(new Error('Invalid credentials'), { status: 401 });
 }
 
-function signupCustomer({ name, email, password }) {
-    const existing = repos.customers.findOne((u) => u.email.toLowerCase() === String(email).toLowerCase());
+async function signupCustomer({ name, email, password }) {
+    const existing = await repos.customers.findOne((u) => u.email.toLowerCase() === String(email).toLowerCase());
     if (existing) throw Object.assign(new Error('Email already registered'), { status: 409 });
 
-    const user = repos.customers.insert({
+    const user = await repos.customers.insert({
         id: `cust-${uuidv4()}`,
         name,
         email,

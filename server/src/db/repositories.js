@@ -1,24 +1,20 @@
 'use strict';
 
-const path = require('path');
-const env = require('../config/env');
-const JsonCollection = require('./jsonCollection');
-
-const p = (...parts) => path.join(env.dbDir, ...parts);
+const { PgCollection } = require('./pgCollection');
 
 module.exports = {
-    admins: new JsonCollection(p('users', 'admins.json')),
-    agents: new JsonCollection(p('users', 'agents.json')),
-    customers: new JsonCollection(p('users', 'customers.json')),
+    admins: new PgCollection('admins'),
+    agents: new PgCollection('agents'),
+    customers: new PgCollection('customers'),
 
-    products: new JsonCollection(p('products', 'products.json')),
-    agentAssignments: new JsonCollection(p('products', 'agent_assignments.json')),
+    products: new PgCollection('products'),
+    agentAssignments: new PgCollection('agent_assignments'),
 
-    callLogs: new JsonCollection(p('calls', 'call_logs.json')),
-    dispositions: new JsonCollection(p('calls', 'dispositions.json')),
-    quotations: new JsonCollection(p('calls', 'quotations.json')),
-    feedback: new JsonCollection(p('calls', 'feedback.json')),
+    callLogs: new PgCollection('call_logs'),
+    dispositions: new PgCollection('dispositions'),
+    quotations: new PgCollection('quotations'),
+    feedback: new PgCollection('feedback'),
 
-    chats: new JsonCollection(p('chats', 'chats.json')),
-    chatMessages: new JsonCollection(p('chats', 'messages.json')),
+    chats: new PgCollection('chats'),
+    chatMessages: new PgCollection('messages'),
 };

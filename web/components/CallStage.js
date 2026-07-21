@@ -30,7 +30,7 @@ function CallTimer() {
  * (and confusing) next to our own chat system, and there's no prop to
  * simply turn it off short of building the layout by hand.
  */
-export default function CallStage() {
+export default function CallStage({ micDisabled = false }) {
     const tracks = useTracks([Track.Source.Camera, Track.Source.ScreenShare], { onlySubscribed: false });
 
     return (
@@ -43,7 +43,10 @@ export default function CallStage() {
                 <ParticipantTile className="rounded-xl overflow-hidden" />
             </GridLayout>
             <div className="py-2 flex justify-center">
-                <ControlBar controls={{ chat: false, leave: false, settings: false }} variation="minimal" />
+                <ControlBar
+                    controls={{ chat: false, leave: false, settings: false, microphone: !micDisabled }}
+                    variation="minimal"
+                />
             </div>
         </div>
     );

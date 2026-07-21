@@ -1,21 +1,19 @@
 'use strict';
 
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const repos = require('../db/repositories');
 const callService = require('./callService');
-const env = require('../config/env');
+const { recordingsBucket } = require('../storage/supabaseStorage');
 const { requireAuth, requireRole } = require('../auth/authMiddleware');
 
 const router = express.Router();
 const MAX_RECORDING_BYTES = 100 * 1024 * 1024; // 100MB — a full call's audio track, generously bounded
 
-function enrich(log) {
-    const customer = repos.customers.findById(log.customer_id);
-    const agent = repos.agents.findById(log.agent_id);
-    const product = repos.products.findById(log.product_id);
+async function enrich(log) {
+    const customer = await repos.customers.findById(log.customer_id);
+    const agent = await repos.agents.findById(log.agent_id);
+    const product = await repos.products.findById(log.product_id);
     return {
         ...log,
         customer_name: customer?.name || 'Unknown',
@@ -25,63 +23,64 @@ function enrich(log) {
 }
 
 // Admin: full history. Agent: only calls they personally handled.
-router.get('/history', requireAuth, requireRole('admin', 'agent'), (req, res) => {
-    let logs = repos.callLogs.all();
+router.get('/history', requireAuth, requireRole('admin', 'agent'), async (req, res) => {
+    let logs = await repos.callLogs.all();
     if (req.user.role === 'agent') {
         logs = logs.filter((l) => l.agent_id === req.user.sub);
     }
-    res.json(logs.map(enrich).sort((a, b) => new Date(b.started_at) - new Date(a.started_at)));
+    const enriched = await Promise.all(logs.map(enrich));
+    res.json(enriched.sort((a, b) => new Date(b.started_at) - new Date(a.started_at)));
 });
 
 router.get('/live', requireAuth, requireRole('admin'), (req, res) => {
     res.json(callService.getLiveCalls());
 });
 
-router.get('/:id', requireAuth, requireRole('admin', 'agent'), (req, res) => {
-    const log = repos.callLogs.findById(req.params.id);
+router.get('/:id', requireAuth, requireRole('admin', 'agent'), async (req, res) => {
+    const log = await repos.callLogs.findById(req.params.id);
     if (!log) return res.status(404).json({ error: 'Call log not found' });
     if (req.user.role === 'agent' && log.agent_id !== req.user.sub) {
         return res.status(403).json({ error: 'Forbidden' });
     }
-    res.json(enrich(log));
+    res.json(await enrich(log));
 });
 
 // Mandatory post-call disposition — agent only, for their own call.
-router.post('/:id/disposition', requireAuth, requireRole('agent'), (req, res) => {
+router.post('/:id/disposition', requireAuth, requireRole('agent'), async (req, res) => {
     const { outcome, notes } = req.body;
     if (!['Success', 'Failed', 'Callback Required'].includes(outcome)) {
         return res.status(400).json({ error: 'outcome must be Success, Failed, or Callback Required' });
     }
-    const log = repos.callLogs.findById(req.params.id);
+    const log = await repos.callLogs.findById(req.params.id);
     if (!log || log.agent_id !== req.user.sub) return res.status(404).json({ error: 'Call log not found' });
 
-    const disposition = repos.dispositions.insert({
+    const disposition = await repos.dispositions.insert({
         id: `disp-${uuidv4()}`,
         call_log_id: req.params.id,
         outcome,
         notes: notes || '',
         created_at: new Date().toISOString(),
     });
-    repos.callLogs.updateById(req.params.id, { disposition_id: disposition.id });
+    await repos.callLogs.updateById(req.params.id, { disposition_id: disposition.id });
     res.status(201).json(disposition);
 });
 
 const FEEDBACK_PARAMS = ['professionalism', 'callQuality', 'resolution', 'overall'];
 
 // Post-call customer feedback — customer only, for their own call, one per call.
-router.post('/:id/feedback', requireAuth, requireRole('customer'), (req, res) => {
+router.post('/:id/feedback', requireAuth, requireRole('customer'), async (req, res) => {
     const { ratings, comment } = req.body;
-    const log = repos.callLogs.findById(req.params.id);
+    const log = await repos.callLogs.findById(req.params.id);
     if (!log || log.customer_id !== req.user.sub) return res.status(404).json({ error: 'Call log not found' });
 
-    const existing = repos.feedback.findOne((f) => f.call_log_id === req.params.id);
+    const existing = await repos.feedback.findOne((f) => f.call_log_id === req.params.id);
     if (existing) return res.status(409).json({ error: 'Feedback already submitted for this call' });
 
     if (!ratings || FEEDBACK_PARAMS.some((p) => !Number.isInteger(ratings[p]) || ratings[p] < 1 || ratings[p] > 5)) {
         return res.status(400).json({ error: `ratings must include 1-5 integers for: ${FEEDBACK_PARAMS.join(', ')}` });
     }
 
-    const entry = repos.feedback.insert({
+    const entry = await repos.feedback.insert({
         id: `fb-${uuidv4()}`,
         call_log_id: req.params.id,
         customer_id: req.user.sub,
@@ -104,6 +103,18 @@ router.post('/:id/monitor', requireAuth, requireRole('admin'), async (req, res) 
     }
 });
 
+// Ends an active monitor session — currently only whisper has state to unwind
+// (puts the customer/agent back on a normal call); listen/barge just close client-side.
+router.post('/:id/monitor/stop', requireAuth, requireRole('admin'), async (req, res) => {
+    const { mode } = req.body;
+    try {
+        const result = await callService.stopMonitor(req.params.id, { id: req.user.sub, name: req.user.name }, mode);
+        res.json(result);
+    } catch (err) {
+        res.status(err.status || 500).json({ error: err.message });
+    }
+});
+
 // Force-terminate — admin action, or the agent/customer ending their own call.
 router.post('/:id/hangup', requireAuth, requireRole('admin', 'agent', 'customer'), async (req, res) => {
     try {
@@ -120,29 +131,36 @@ router.post(
     requireAuth,
     requireRole('agent'),
     express.raw({ type: '*/*', limit: MAX_RECORDING_BYTES }),
-    (req, res) => {
-        const log = repos.callLogs.findById(req.params.id);
+    async (req, res) => {
+        const log = await repos.callLogs.findById(req.params.id);
         if (!log || log.agent_id !== req.user.sub) return res.status(404).json({ error: 'Call log not found' });
         if (!req.body || req.body.length === 0) return res.status(400).json({ error: 'Empty recording body' });
 
         const filename = `${req.params.id}.webm`;
-        fs.writeFileSync(path.join(env.recordingsDir, filename), req.body);
-        repos.callLogs.updateById(req.params.id, { recording_path: filename });
+        const { error } = await recordingsBucket.upload(filename, req.body, {
+            contentType: 'audio/webm',
+            upsert: true,
+        });
+        if (error) return res.status(502).json({ error: 'Recording upload failed' });
+
+        await repos.callLogs.updateById(req.params.id, { recording_path: filename });
         res.status(201).json({ recording_path: filename });
     }
 );
 
-// Playback — admin any call, agent only their own.
-router.get('/:id/recording', requireAuth, requireRole('admin', 'agent'), (req, res) => {
-    const log = repos.callLogs.findById(req.params.id);
+// Playback — admin any call, agent only their own. Bucket is private, so this
+// downloads server-side and streams the bytes back rather than using a public URL.
+router.get('/:id/recording', requireAuth, requireRole('admin', 'agent'), async (req, res) => {
+    const log = await repos.callLogs.findById(req.params.id);
     if (!log || !log.recording_path) return res.status(404).json({ error: 'No recording for this call' });
     if (req.user.role === 'agent' && log.agent_id !== req.user.sub) {
         return res.status(403).json({ error: 'Forbidden' });
     }
 
-    const filePath = path.join(env.recordingsDir, log.recording_path);
-    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Recording file missing' });
-    res.type('audio/webm').sendFile(filePath);
+    const { data, error } = await recordingsBucket.download(log.recording_path);
+    if (error) return res.status(404).json({ error: 'Recording file missing' });
+    const buffer = Buffer.from(await data.arrayBuffer());
+    res.type('audio/webm').send(buffer);
 });
 
 // 1-click callback from a past log.

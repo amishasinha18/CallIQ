@@ -37,14 +37,14 @@ async function isAgentOnline(agentId) {
 }
 
 async function onlineAgentIdsForProduct(productId) {
-    const assigned = agentState.assignedAgentIds(productId);
+    const assigned = await agentState.assignedAgentIds(productId);
     const flags = await Promise.all(assigned.map((id) => isAgentOnline(id)));
     return assigned.filter((_, i) => flags[i]);
 }
 
 /** Visibility Check — used by the customer product grid to show/hide the Text button. */
 async function availabilityByProduct() {
-    const products = repos.products.all();
+    const products = await repos.products.all();
     const result = {};
     await Promise.all(
         products.map(async (p) => {
@@ -60,7 +60,7 @@ function publicChat(chat) {
 
 /** Customer initiates a chat — created PENDING, ring-all broadcast to every online agent on this product. */
 async function initiateChat({ customerId, customerName, productId }) {
-    const product = repos.products.findById(productId);
+    const product = await repos.products.findById(productId);
     if (!product) throw Object.assign(new Error('Unknown product'), { status: 404 });
 
     const onlineAgentIds = await onlineAgentIdsForProduct(productId);
@@ -68,7 +68,7 @@ async function initiateChat({ customerId, customerName, productId }) {
         throw Object.assign(new Error('No agents online for this product'), { status: 409 });
     }
 
-    const chat = repos.chats.insert({
+    const chat = await repos.chats.insert({
         id: `chat-${uuidv4()}`,
         customer_id: customerId,
         customer_name: customerName,
@@ -100,7 +100,7 @@ async function initiateChat({ customerId, customerName, productId }) {
 
 /** Customer withdraws a still-PENDING request before anyone accepts it. */
 async function cancelChat(chatId, customerId) {
-    const chat = repos.chats.findById(chatId);
+    const chat = await repos.chats.findById(chatId);
     if (!chat || chat.customer_id !== customerId) {
         throw Object.assign(new Error('Chat not found'), { status: 404 });
     }
@@ -108,7 +108,7 @@ async function cancelChat(chatId, customerId) {
         throw Object.assign(new Error('Chat is no longer pending'), { status: 409 });
     }
 
-    const updated = repos.chats.updateById(chatId, { status: 'CLOSED', closed_at: new Date().toISOString() });
+    const updated = await repos.chats.updateById(chatId, { status: 'CLOSED', closed_at: new Date().toISOString() });
 
     const onlineAgentIds = await onlineAgentIdsForProduct(chat.product_id);
     onlineAgentIds.forEach((id) => emitToAgent(id, 'chat:claimed', { chatId }));
@@ -129,12 +129,12 @@ async function acceptChat(chatId, agentId, agentName) {
         throw Object.assign(new Error('Already claimed'), { status: 409 });
     }
 
-    const chat = repos.chats.findById(chatId);
+    const chat = await repos.chats.findById(chatId);
     if (!chat || chat.status !== 'PENDING') {
         throw Object.assign(new Error('Already claimed'), { status: 409 });
     }
 
-    const updated = repos.chats.updateById(chatId, {
+    const updated = await repos.chats.updateById(chatId, {
         status: 'ASSIGNED',
         agent_id: agentId,
         assigned_at: new Date().toISOString(),
@@ -159,17 +159,17 @@ function assertParticipant(chat, role, userId) {
 }
 
 async function sendMessage(chatId, role, userId, senderName, text) {
-    const chat = repos.chats.findById(chatId);
+    const chat = await repos.chats.findById(chatId);
     if (!chat || !['ASSIGNED', 'ACTIVE'].includes(chat.status)) {
         throw Object.assign(new Error('Chat is not open'), { status: 409 });
     }
     assertParticipant(chat, role, userId);
 
     if (chat.status === 'ASSIGNED') {
-        repos.chats.updateById(chatId, { status: 'ACTIVE' });
+        await repos.chats.updateById(chatId, { status: 'ACTIVE' });
     }
 
-    const message = repos.chatMessages.insert({
+    const message = await repos.chatMessages.insert({
         id: `msg-${uuidv4()}`,
         chat_id: chatId,
         sender_role: role,
@@ -185,13 +185,13 @@ async function sendMessage(chatId, role, userId, senderName, text) {
 }
 
 async function closeChat(chatId, role, userId) {
-    const chat = repos.chats.findById(chatId);
+    const chat = await repos.chats.findById(chatId);
     if (!chat || chat.status === 'CLOSED') {
         throw Object.assign(new Error('Chat not found or already closed'), { status: 404 });
     }
     if (role !== 'admin') assertParticipant(chat, role, userId);
 
-    const updated = repos.chats.updateById(chatId, { status: 'CLOSED', closed_at: new Date().toISOString() });
+    const updated = await repos.chats.updateById(chatId, { status: 'CLOSED', closed_at: new Date().toISOString() });
 
     emitToAgent(chat.agent_id, 'chat:closed', { chatId, closedBy: role });
     emitToCustomer(chat.customer_id, 'chat:closed', { chatId, closedBy: role });
@@ -201,16 +201,17 @@ async function closeChat(chatId, role, userId) {
 
 /** Only agents assigned to the exact same product, currently online, excluding the current agent. */
 async function transferCandidates(chatId, currentAgentId) {
-    const chat = repos.chats.findById(chatId);
+    const chat = await repos.chats.findById(chatId);
     if (!chat) throw Object.assign(new Error('Chat not found'), { status: 404 });
 
     const onlineAgentIds = await onlineAgentIdsForProduct(chat.product_id);
     const candidateIds = onlineAgentIds.filter((id) => id !== currentAgentId);
-    return candidateIds.map((id) => repos.agents.findById(id)).filter(Boolean).map(({ password, ...rest }) => rest);
+    const candidates = await Promise.all(candidateIds.map((id) => repos.agents.findById(id)));
+    return candidates.filter(Boolean).map(({ password, ...rest }) => rest);
 }
 
 async function transferChat(chatId, fromAgentId, toAgentId) {
-    const chat = repos.chats.findById(chatId);
+    const chat = await repos.chats.findById(chatId);
     if (!chat || chat.agent_id !== fromAgentId) {
         throw Object.assign(new Error('You do not own this chat'), { status: 403 });
     }
@@ -222,8 +223,8 @@ async function transferChat(chatId, fromAgentId, toAgentId) {
         });
     }
 
-    const toAgent = repos.agents.findById(toAgentId);
-    const updated = repos.chats.updateById(chatId, {
+    const toAgent = await repos.agents.findById(toAgentId);
+    const updated = await repos.chats.updateById(chatId, {
         agent_id: toAgentId,
         transfer_history: [
             ...chat.transfer_history,
@@ -239,7 +240,7 @@ async function transferChat(chatId, fromAgentId, toAgentId) {
     return updated;
 }
 
-function getChat(chatId) {
+async function getChat(chatId) {
     return repos.chats.findById(chatId);
 }
 

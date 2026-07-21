@@ -12,5 +12,12 @@
     "outcome": "Failed",
     "notes": "",
     "created_at": "2026-07-18T13:21:32.959Z"
+  },
+  {
+    "id": "disp-9d370d75-ebf6-4c63-88b5-5994f580cdb4",
+    "call_log_id": "4ac6aa41-aa07-4681-9e76-37836ab77d68",
+    "outcome": "Success",
+    "notes": "",
+    "created_at": "2026-07-21T09:50:22.109Z"
   }
 ]

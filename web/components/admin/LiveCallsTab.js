@@ -13,7 +13,7 @@ export default function LiveCallsTab() {
     async function monitor(callId, mode) {
         try {
             const result = await api.post(`/calls/${callId}/monitor`, { mode });
-            setModal({ mode, ...result });
+            setModal({ mode, callId, ...result });
         } catch (err) {
             setError(err.message);
         }

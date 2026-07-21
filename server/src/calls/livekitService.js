@@ -104,6 +104,25 @@ async function teardownRooms(callId) {
     ]);
 }
 
+/**
+ * Flip the agent's publish permission in the whisper room live, without a new
+ * token or reconnect. The agent's whisper-room grant is always `canPublish:
+ * false` at connect time (see agentWhisperToken) — this is the only way they
+ * can ever actually speak into it, and only for as long as a whisper is
+ * server-acknowledged as active, so a modified client can't self-unmute.
+ *
+ * `updateParticipant`'s permission argument REPLACES the participant's whole
+ * ParticipantPermission, it does not merge — so `canSubscribe: true` must be
+ * repeated here every time, or the agent would silently lose the ability to
+ * hear the admin the moment this is called.
+ */
+async function setAgentWhisperPublish(callId, agentIdentity, canPublish) {
+    await roomService.updateParticipant(whisperRoom(callId), agentIdentity, undefined, {
+        canSubscribe: true,
+        canPublish,
+    });
+}
+
 module.exports = {
     mainRoom,
     whisperRoom,
@@ -113,6 +132,7 @@ module.exports = {
     adminBargeToken,
     adminWhisperToken,
     agentWhisperToken,
+    setAgentWhisperPublish,
     teardownRooms,
     roomService,
 };
