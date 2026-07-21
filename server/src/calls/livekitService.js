@@ -117,10 +117,26 @@ async function teardownRooms(callId) {
  * hear the admin the moment this is called.
  */
 async function setAgentWhisperPublish(callId, agentIdentity, canPublish) {
-    await roomService.updateParticipant(whisperRoom(callId), agentIdentity, undefined, {
-        canSubscribe: true,
-        canPublish,
-    });
+    const room = whisperRoom(callId);
+    const permission = { canSubscribe: true, canPublish };
+
+    // The agent's browser joins this room in the background the moment the call
+    // connects (see acceptCall/WhisperAudio.js) — on localhost that finishes near-
+    // instantly, but over a real network (production) it can lag behind an admin
+    // clicking Whisper right away, and LiveKit rejects updateParticipant on a
+    // participant that hasn't actually joined yet ("participant does not exist").
+    // Retry briefly rather than failing the whole whisper attempt on that race.
+    const maxAttempts = 6;
+    const delayMs = 350;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            await roomService.updateParticipant(room, agentIdentity, undefined, permission);
+            return;
+        } catch (err) {
+            if (attempt === maxAttempts) throw err;
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+    }
 }
 
 module.exports = {
