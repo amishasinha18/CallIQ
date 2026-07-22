@@ -1,0 +1,25 @@
+name: keep-alive
+
+# Render's free web services spin down after ~15 minutes of no traffic and
+# take 30-60s to wake back up. Pinging both services every 10 minutes resets
+# that idle timer before it fires. Repo is public, so Actions minutes here
+# are unlimited/free.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backend
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 https://calliq-t8ut.onrender.com/health || echo "000")
+          echo "backend /health -> $code"
+
+      - name: Ping frontend
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 https://calliq-web-mfv4.onrender.com/ || echo "000")
+          echo "frontend / -> $code"
