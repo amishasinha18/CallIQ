@@ -16,10 +16,10 @@ jobs:
     steps:
       - name: Ping backend
         run: |
-          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 https://calliq-t8ut.onrender.com/health || echo "000")
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 75 https://calliq-t8ut.onrender.com/health) || true
           echo "backend /health -> $code"
 
       - name: Ping frontend
         run: |
-          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 https://calliq-web-mfv4.onrender.com/ || echo "000")
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 75 https://calliq-web-mfv4.onrender.com/) || true
           echo "frontend / -> $code"
