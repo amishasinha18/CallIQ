@@ -3,7 +3,10 @@
 require('dotenv').config();
 
 module.exports = {
-    port: process.env.PORT || 4000,
+    // 4100 to match everything that talks to it: server/.env.example, the web app's
+    // NEXT_PUBLIC_API_URL, the README and docs/DEVELOPMENT.md. With 4000 here, a server
+    // started without PORT in its .env listened where nothing was looking for it.
+    port: process.env.PORT || 4100,
 
     jwtSecret: process.env.JWT_SECRET,
     jwtExpiresIn: process.env.JWT_EXPIRES_IN || '12h',
