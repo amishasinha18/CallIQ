@@ -6,6 +6,16 @@ const cors = require('cors');
 const { Server } = require('socket.io');
 
 const env = require('./config/env');
+
+// Without JWT_SECRET the server still boots and /health still answers, but every login
+// throws inside jsonwebtoken ("secretOrPrivateKey must have a value") and comes back as
+// a 500. Say so at startup, where it is obvious, instead of at the first login attempt.
+// A warning rather than an exit, so a deployment that is up today stays up.
+if (!env.jwtSecret) {
+    console.warn('[CallIQ] JWT_SECRET is not set - logins will fail. '
+        + 'Copy server/.env.example to server/.env and set it.');
+}
+
 const authRoutes = require('./auth/authRoutes');
 const productsRoutes = require('./products/productsRoutes');
 const agentsRoutes = require('./agents/agentsRoutes');
